@@ -1,0 +1,58 @@
+services:
+  llama-server:
+    build:
+      context: .
+      args:
+        UID: 10001
+        GID: 10001
+
+    container_name: llama-server
+    restart: unless-stopped
+
+    gpus: all
+
+    ports:
+      - "127.0.0.1:8001:8000"
+
+    volumes:
+      - /srv/models/llama:/models:ro
+
+    command:
+      - --model
+      - /models/prompt-enhancer.gguf
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --n-gpu-layers
+      - "999"
+      - --flash-attn
+      - "on"
+      - --ctx-size
+      - "8192"
+
+    security_opt:
+      - no-new-privileges:true
+
+    cap_drop:
+      - ALL
+
+    read_only: true
+
+    tmpfs:
+      - /tmp:size=512m,mode=1777
+
+    pids_limit: 256
+
+    mem_swappiness: 0
+
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -f
+        - http://127.0.0.1:8000/health
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
