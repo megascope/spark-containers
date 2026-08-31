@@ -12,7 +12,7 @@ services:
     gpus: all
 
     ports:
-      - "127.0.0.1:8001:8000"
+      - "${BIND_ADDR}:8000"
 
     volumes:
       - "${MODELS_DIR}:/models:ro"
