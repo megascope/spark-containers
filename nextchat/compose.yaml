@@ -1,0 +1,45 @@
+services:
+  nextchat:
+    image: yidadaa/chatgpt-next-web:v2.16.1
+    restart: unless-stopped
+    init: true
+    user: "65534:65534"
+
+    ports:
+      - "${NEXTCHAT_LISTEN_ADDR:-127.0.0.1}:${NEXTCHAT_PORT:-3000}:3000"
+
+    environment:
+      OPENAI_API_KEY: "${LITELLM_MASTER_KEY:?set LITELLM_MASTER_KEY in .env}"
+      BASE_URL: http://litellm:4000
+      CODE: "${NEXTCHAT_ACCESS_CODE:?set NEXTCHAT_ACCESS_CODE in .env}"
+      CUSTOM_MODELS: "-all,+${LITELLM_MODEL:-local-llama}"
+      DEFAULT_MODEL: "${LITELLM_MODEL:-local-llama}"
+      VISION_MODELS: "${LITELLM_MODEL:-local-llama}"
+      HIDE_USER_API_KEY: "1"
+      DISABLE_FAST_LINK: "1"
+      ENABLE_MCP: "false"
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    networks:
+      - llm-backend
+
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,uid=65534,gid=65534,mode=1777
+    pids_limit: 256
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+networks:
+  llm-backend:
+    external: true
+    name: "${LLM_NETWORK:-spark-llm}"

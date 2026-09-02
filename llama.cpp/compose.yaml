@@ -5,33 +5,29 @@ services:
       args:
         UID: 10001
         GID: 10001
+        LLAMA_CPP_REF: "${LLAMA_CPP_REF:-v0.3.0}"
 
-    container_name: llama-server
     restart: unless-stopped
+    init: true
 
     gpus: all
 
     ports:
-      - "${BIND_ADDR}:8000"
+      - "${LLAMA_LISTEN_ADDR:-127.0.0.1}:${LLAMA_PORT:-8000}:8000"
 
     volumes:
       - "${MODELS_DIR}:/models:ro"
 
-    command:
-      - --model
-      - "/models/${MODEL_FILE}"
-      - --mmproj
-      - "/models/${MMPROJ_FILE}"
-      - --host
-      - 0.0.0.0
-      - --port
-      - "8000"
-      - --n-gpu-layers
-      - "999"
-      - --flash-attn
-      - "on"
-      - --ctx-size
-      - "8192"
+    environment:
+      MODEL_FILE: "${MODEL_FILE:?set MODEL_FILE in .env}"
+      MMPROJ_FILE: "${MMPROJ_FILE:-}"
+      LLAMA_API_KEY: "${LLAMA_API_KEY:?set LLAMA_API_KEY in .env}"
+      LLAMA_CONTEXT_SIZE: "${LLAMA_CONTEXT_SIZE:-8192}"
+      LLAMA_GPU_LAYERS: "${LLAMA_GPU_LAYERS:-999}"
+      LLAMA_FLASH_ATTN: "${LLAMA_FLASH_ATTN:-on}"
+
+    networks:
+      - llm-backend
 
     security_opt:
       - no-new-privileges:true
@@ -49,12 +45,13 @@ services:
     mem_swappiness: 0
 
     healthcheck:
-      test:
-        - CMD
-        - curl
-        - -f
-        - http://127.0.0.1:8000/health
+      test: ["CMD-SHELL", "curl -fsS -H \"Authorization: Bearer $$LLAMA_API_KEY\" http://127.0.0.1:8000/health >/dev/null"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 30s
+
+networks:
+  llm-backend:
+    external: true
+    name: "${LLM_NETWORK:-spark-llm}"

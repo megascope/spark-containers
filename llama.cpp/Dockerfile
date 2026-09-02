@@ -1,5 +1,7 @@
 FROM nvcr.io/nvidia/cuda:13.0.1-devel-ubuntu22.04 AS build
 
+ARG LLAMA_CPP_REF=v0.3.0
+
 RUN apt-get update && apt-get install -y \
     git \
     cmake \
@@ -8,7 +10,8 @@ RUN apt-get update && apt-get install -y \
     libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
-RUN git clone --depth=1 https://github.com/ggml-org/llama.cpp /src/llama.cpp
+RUN git clone --depth=1 --branch "${LLAMA_CPP_REF}" \
+      https://github.com/ggml-org/llama.cpp /src/llama.cpp
 
 WORKDIR /src/llama.cpp
 
@@ -55,6 +58,9 @@ RUN apt-get update && apt-get install -y \
 
 COPY --from=build /out/lib/ /app/
 COPY --from=build /out/llama-server /app/llama-server
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+
+RUN chmod 0555 /app/docker-entrypoint.sh
 
 ENV LD_LIBRARY_PATH=/app:${LD_LIBRARY_PATH}
 
@@ -64,4 +70,4 @@ WORKDIR /home/llama
 
 EXPOSE 8000
 
-ENTRYPOINT ["/app/llama-server"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]

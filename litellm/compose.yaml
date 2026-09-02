@@ -1,0 +1,53 @@
+services:
+  litellm:
+    image: ghcr.io/berriai/litellm-non_root:v1.99.0
+    restart: unless-stopped
+    init: true
+    user: "65534:65534"
+
+    ports:
+      - "${LITELLM_LISTEN_ADDR:-127.0.0.1}:${LITELLM_PORT:-4000}:4000"
+
+    environment:
+      LITELLM_MASTER_KEY: "${LITELLM_MASTER_KEY:?set LITELLM_MASTER_KEY in .env}"
+      LLAMA_API_KEY: "${LLAMA_API_KEY:?set LLAMA_API_KEY in .env}"
+      LITELLM_MODEL: "${LITELLM_MODEL:-local-llama}"
+      LLAMA_CPP_MODEL: "openai/${LLAMA_CPP_MODEL_NAME:-local-llama}"
+      LITELLM_NON_ROOT: "true"
+      LITELLM_TELEMETRY: "false"
+
+    command:
+      - --config
+      - /app/config.yaml
+      - --host
+      - 0.0.0.0
+      - --port
+      - "4000"
+
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+
+    networks:
+      - llm-backend
+
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,uid=65534,gid=65534,mode=1777
+      - /app/.cache:rw,noexec,nosuid,nodev,size=128m,uid=65534,gid=65534,mode=0700
+    pids_limit: 256
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:4000/health/liveliness', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+networks:
+  llm-backend:
+    external: true
+    name: "${LLM_NETWORK:-spark-llm}"
