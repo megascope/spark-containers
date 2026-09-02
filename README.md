@@ -6,7 +6,7 @@ This repository runs three independently managed Compose projects:
 - `litellm`: a stateless, authenticated OpenAI-compatible proxy in front of llama.cpp.
 - `nextchat`: the browser UI, configured to use LiteLLM.
 
-All three join one pre-created, internal Docker network. The internal flag lets the containers communicate without granting them public-internet egress. Each host port is bound to a configurable interface; the defaults are localhost only.
+All three join one pre-created, internal Docker network for service-to-service traffic. Each service also gets a project-local bridge network so Docker can publish its host port. Each host port is bound to a configurable interface; the defaults are localhost only.
 
 ## Prerequisites
 
@@ -40,13 +40,13 @@ Do not use `0.0.0.0` unless every interface on the host is trusted or separately
 
 ## Create the shared network
 
-Create this once. If you change `LLM_NETWORK`, use the same name here:
+The `compose.sh` wrapper automatically creates the shared internal network the first time an `up` command is run. If you prefer to create it manually, or are not using the wrapper:
 
 ```bash
 docker network create --internal spark-llm
 ```
 
-The network is external to each Compose project, so taking any one project down does not disrupt the others.
+The backend network is external to each Compose project, so taking any one project down does not disrupt the others. The wrapper refuses to use an existing backend network with the configured name if it is not internal. Compose creates and removes each project's ordinary ingress bridge automatically.
 
 ## Start and stop
 
@@ -90,6 +90,7 @@ Open `http://NEXTCHAT_LISTEN_ADDR:NEXTCHAT_PORT`, enter `NEXTCHAT_ACCESS_CODE`, 
 
 - llama.cpp and LiteLLM use upstream non-root runtimes; NextChat is forced to UID/GID 65534 because its upstream image otherwise defaults to root.
 - Every service drops all Linux capabilities, enables `no-new-privileges`, uses a read-only root filesystem, and receives only small tmpfs mounts needed at runtime.
+- The shared backend network is internal. Project-local ingress bridges exist solely to support host port publishing; like ordinary Docker bridge networks, they also permit outbound connections from the containers.
 - Models are bind-mounted read-only and are never copied into an image.
 - LiteLLM has no database, Redis, cache, or persistent volume; configuration is file-based and request handling is stateless.
 - The pinned NextChat release is intended here only for trusted private clients. Do not publish it directly to the internet.

@@ -28,6 +28,7 @@ services:
 
     networks:
       - llm-backend
+      - ingress
 
     security_opt:
       - no-new-privileges:true
@@ -52,6 +53,8 @@ services:
       start_period: 30s
 
 networks:
+  ingress:
+    driver: bridge
   llm-backend:
     external: true
     name: "${LLM_NETWORK:-spark-llm}"
