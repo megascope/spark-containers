@@ -20,6 +20,8 @@ services:
     command:
       - --model
       - "/models/${MODEL_FILE}"
+      - --mmproj
+      - "/models/${MMPROJ_FILE}"
       - --host
       - 0.0.0.0
       - --port
