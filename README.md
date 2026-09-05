@@ -86,6 +86,39 @@ curl -fsS "http://${LITELLM_LISTEN_ADDR}:${LITELLM_PORT}/v1/models" \
 
 Open `http://NEXTCHAT_LISTEN_ADDR:NEXTCHAT_PORT`, enter `NEXTCHAT_ACCESS_CODE`, and select the configured `LITELLM_MODEL`.
 
+## Add Ollama models to NextChat
+
+With an `ollama_chat/*` route and `check_provider_endpoint: true` configured in
+`litellm/config.yaml`, use the Python 3 helper to query the running LiteLLM
+service and add its discovered Ollama models to NextChat's picker:
+
+```bash
+ollama_export=$(python3 litellm/ollama-models.py) &&
+  eval "$ollama_export" &&
+  ./compose.sh nextchat up -d
+```
+
+The helper prints only a shell-quoted `export OLLAMA_MODELS=...` on success.
+It selects IDs starting with `ollama_chat/`, adds NextChat's `+` marker, removes
+duplicates, and sorts them. The existing local model stays in the picker.
+Errors go to stderr with a nonzero exit status, so the command above does not
+apply a failed lookup. An empty inventory exports an empty value.
+Wildcard route entries such as `ollama_chat/*` are skipped. If LiteLLM returns
+only Ollama wildcard routes without any concrete Ollama models, the helper fails
+with a discovery diagnostic instead of clearing the existing export.
+
+`OLLAMA_MODELS` defaults to empty and is appended to the existing local model.
+The export overrides `.env` for the current shell; rerun the command when the
+Ollama inventory changes, then refresh NextChat. Alternatively, save the generated
+value as `OLLAMA_MODELS=...` in `.env` for future Compose invocations.
+The helper uses `compose.sh litellm exec` to request `/v1/models` inside the
+running LiteLLM container, using its existing master key. No endpoint argument
+or separate credentials are needed; the Ollama endpoint stays in LiteLLM's
+configuration. Run it on the Docker host with Python 3 and Compose available.
+After changing LiteLLM's configuration, restart LiteLLM before running the helper.
+Only LiteLLM needs network access to Ollama. The discovered list can include
+embedding-only models; omit those if maintaining the list manually.
+
 ## Security and persistence
 
 - llama.cpp and LiteLLM use upstream non-root runtimes; NextChat is forced to UID/GID 65534 because its upstream image otherwise defaults to root.
