@@ -11,6 +11,7 @@ services:
     environment:
       LITELLM_MASTER_KEY: "${LITELLM_MASTER_KEY:?set LITELLM_MASTER_KEY in .env}"
       LLAMA_API_KEY: "${LLAMA_API_KEY:?set LLAMA_API_KEY in .env}"
+      OLLAMA_API_BASE: "${OLLAMA_API_BASE:?set OLLAMA_API_BASE in .env}"
       LITELLM_MODEL: "${LITELLM_MODEL:-local-llama}"
       LLAMA_CPP_MODEL: "openai/${LLAMA_CPP_MODEL_NAME:-local-llama}"
       LITELLM_NON_ROOT: "true"

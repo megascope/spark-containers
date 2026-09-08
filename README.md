@@ -29,6 +29,8 @@ Edit `.env`. At minimum, set `MODELS_DIR`, `MODEL_FILE`, and replace all three `
 
 `LLAMA_API_KEY` protects the llama.cpp backend from other containers on the shared network. `LITELLM_MASTER_KEY` protects the client-facing LiteLLM API and is supplied to NextChat. `NEXTCHAT_ACCESS_CODE` protects the UI.
 
+Set `OLLAMA_API_BASE` to the Ollama server URL reachable from the LiteLLM container (for example, `http://ollama-host:11434`). To disable the NextChat UI access code, leave `NEXTCHAT_ACCESS_CODE` blank or remove it from `.env`, then recreate NextChat with `./compose.sh nextchat up -d`. Anyone who can reach the UI can then use its configured backend.
+
 To expose LiteLLM and NextChat on a private LAN address, for example:
 
 ```dotenv

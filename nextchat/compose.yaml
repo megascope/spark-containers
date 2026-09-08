@@ -11,7 +11,7 @@ services:
     environment:
       OPENAI_API_KEY: "${LITELLM_MASTER_KEY:?set LITELLM_MASTER_KEY in .env}"
       BASE_URL: http://litellm:4000
-      CODE: "${NEXTCHAT_ACCESS_CODE:?set NEXTCHAT_ACCESS_CODE in .env}"
+      CODE: "${NEXTCHAT_ACCESS_CODE:-}"
       CUSTOM_MODELS: "-all,+${LITELLM_MODEL:-local-llama}${OLLAMA_MODELS:+,}${OLLAMA_MODELS:-}"
       DEFAULT_MODEL: "${LITELLM_MODEL:-local-llama}"
       VISION_MODELS: "${LITELLM_MODEL:-local-llama}"
