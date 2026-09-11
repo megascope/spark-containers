@@ -8,6 +8,7 @@ Usage: ./compose.sh FOLDER [docker compose arguments...]
 Examples:
   ./compose.sh llama.cpp up -d --build
   ./compose.sh litellm logs -f
+  ./compose.sh litellm up -d
   ./compose.sh nextchat down
 EOF
 }

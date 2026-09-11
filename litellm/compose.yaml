@@ -10,13 +10,24 @@ services:
 
     environment:
       LITELLM_MASTER_KEY: "${LITELLM_MASTER_KEY:?set LITELLM_MASTER_KEY in .env}"
-      LLAMA_API_KEY: "${LLAMA_API_KEY:?set LLAMA_API_KEY in .env}"
-      OLLAMA_API_BASE: "${OLLAMA_API_BASE:?set OLLAMA_API_BASE in .env}"
+      # LiteLLM discovery always sends a Bearer header; an empty token is invalid.
+      LLAMA_API_KEY: "${LLAMA_API_KEY:-not-required}"
+      LLAMA_API_BASE: "${LLAMA_API_BASE:-http://llama-server:8000/v1}"
+      OLLAMA_API_BASE: "${OLLAMA_API_BASE:-}"
       LITELLM_MODEL: "${LITELLM_MODEL:-local-llama}"
       LLAMA_CPP_MODEL: "openai/${LLAMA_CPP_MODEL_NAME:-local-llama}"
       LITELLM_NON_ROOT: "true"
       LITELLM_TELEMETRY: "false"
+      DATABASE_URL: "${DATABASE_URL:-postgresql://litellm:${LITELLM_POSTGRES_PASSWORD:?set LITELLM_POSTGRES_PASSWORD in .env}@postgres:5432/litellm}"
+      UI_USERNAME: "${LITELLM_UI_USERNAME:-admin}"
+      UI_PASSWORD: "${LITELLM_UI_PASSWORD:-${LITELLM_MASTER_KEY}}"
 
+    depends_on:
+      postgres:
+        condition: service_healthy
+        restart: true
+
+    entrypoint: ["python", "/app/start.py"]
     command:
       - --config
       - /app/config.yaml
@@ -27,10 +38,12 @@ services:
 
     volumes:
       - ./config.yaml:/app/config.yaml:ro
+      - ./start.py:/app/start.py:ro
 
     networks:
       - llm-backend
       - ingress
+      - database
 
     security_opt:
       - no-new-privileges:true
@@ -49,7 +62,40 @@ services:
       retries: 3
       start_period: 20s
 
+  postgres:
+    image: postgres:17.11-bookworm
+    restart: unless-stopped
+    # Debian's postgres UID/GID; tmpfs ownership permits rootless initdb.
+    user: "999:999"
+    environment:
+      POSTGRES_USER: litellm
+      POSTGRES_DB: litellm
+      POSTGRES_PASSWORD: "${LITELLM_POSTGRES_PASSWORD:?set LITELLM_POSTGRES_PASSWORD in .env}"
+      PGDATA: /var/lib/postgresql/data/pgdata
+    networks:
+      - database
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      # Cover the image's VOLUME path too, so no anonymous disk volume is used.
+      - /var/lib/postgresql/data:rw,noexec,nosuid,nodev,size=${LITELLM_POSTGRES_TMPFS_SIZE:-1g},uid=999,gid=999,mode=0700
+      - /var/run/postgresql:rw,noexec,nosuid,nodev,size=16m,uid=999,gid=999,mode=0770
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,uid=999,gid=999,mode=1777
+    pids_limit: 256
+    healthcheck:
+      # TCP excludes the temporary socket-only server used during initdb.
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "litellm", "-d", "litellm"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
 networks:
+  database:
+    internal: true
   ingress:
     driver: bridge
   llm-backend:
