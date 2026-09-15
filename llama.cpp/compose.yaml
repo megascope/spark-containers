@@ -5,7 +5,7 @@ services:
       args:
         UID: 10001
         GID: 10001
-        LLAMA_CPP_REF: "${LLAMA_CPP_REF:-v0.3.0}"
+        LLAMA_CPP_REF: "${LLAMA_CPP_REF:-v0.4.1}"
 
     restart: unless-stopped
     init: true
@@ -16,12 +16,23 @@ services:
       - "${LLAMA_LISTEN_ADDR:-127.0.0.1}:${LLAMA_PORT:-8000}:8000"
 
     volumes:
-      - "${MODELS_DIR}:/models:ro"
+      - type: bind
+        source: "${MODELS_DIR:-./empty-models}"
+        target: /models
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: "${HF_CACHE_DIR:-./empty-models}"
+        target: /hf-cache
+        read_only: true
+        bind:
+          create_host_path: false
 
     environment:
-      MODEL_FILE: "${MODEL_FILE:?set MODEL_FILE in .env}"
-      MMPROJ_FILE: "${MMPROJ_FILE:-}"
       LLAMA_API_KEY: "${LLAMA_API_KEY:?set LLAMA_API_KEY in .env}"
+      LLAMA_MODELS_MAX: "${LLAMA_MODELS_MAX:-1}"
+      LLAMA_CACHE: /tmp/llama-cache
       LLAMA_CONTEXT_SIZE: "${LLAMA_CONTEXT_SIZE:-8192}"
       LLAMA_GPU_LAYERS: "${LLAMA_GPU_LAYERS:-999}"
       LLAMA_FLASH_ATTN: "${LLAMA_FLASH_ATTN:-on}"

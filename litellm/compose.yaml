@@ -1,6 +1,6 @@
 services:
   litellm:
-    image: ghcr.io/berriai/litellm-non_root:v1.99.0
+    image: ghcr.io/berriai/litellm-non_root:v1.100.1
     restart: unless-stopped
     init: true
     user: "65534:65534"
@@ -14,6 +14,8 @@ services:
       LLAMA_API_KEY: "${LLAMA_API_KEY:-not-required}"
       LLAMA_API_BASE: "${LLAMA_API_BASE:-http://llama-server:8000/v1}"
       OLLAMA_API_BASE: "${OLLAMA_API_BASE:-}"
+      VLLM_API_BASE: "${VLLM_API_BASE:-}"
+      VLLM_API_KEY: "${VLLM_API_KEY:-${LLAMA_API_KEY:-not-required}}"
       LITELLM_MODEL: "${LITELLM_MODEL:-local-llama}"
       LLAMA_CPP_MODEL: "openai/${LLAMA_CPP_MODEL_NAME:-local-llama}"
       LITELLM_NON_ROOT: "true"

@@ -1,12 +1,90 @@
 # Local LLM serving on DGX Spark
 
-This repository runs three independently managed Compose projects:
+This repository runs four independently managed Compose projects:
 
 - `llama.cpp`: CUDA-backed GGUF/VLM inference.
-- `litellm`: an authenticated OpenAI-compatible proxy in front of llama.cpp, with a temporary Postgres database for its built-in playground.
+- `vllm`: optional HF Safetensors/NVFP4 inference; see [setup and cache discovery](vllm/README.md).
+- `litellm`: an authenticated OpenAI-compatible proxy in front of llama.cpp and optional vLLM/Ollama services, with a temporary Postgres database for its built-in playground.
 - `nextchat`: an optional browser UI, configured to use LiteLLM.
 
-All three join one pre-created, internal Docker network for service-to-service traffic. Each service also gets a project-local bridge network so Docker can publish its host port. Each host port is bound to a configurable interface; the defaults are localhost only.
+All four join one pre-created, internal Docker network for service-to-service traffic. Each service also gets a project-local bridge network so Docker can publish its host port. Each host port is bound to a configurable interface; the defaults are localhost only.
+
+## Model discovery
+
+llama.cpp runs in its native router mode. These two `.env` paths are independent
+and optional:
+
+```dotenv
+MODELS_DIR=/srv/models
+HF_CACHE_DIR=~/.cache/huggingface/hub
+```
+
+Leave either blank to disable that source. With both blank, the router has an
+empty model catalog. A configured directory must already exist; Compose will
+not create it on a typo. Both sources are mounted read-only.
+
+At startup, `llama.cpp/discover-models.py` recursively finds GGUF files in both
+sources and generates a llama.cpp preset under `/tmp`. This supports the standard
+Hugging Face `hub` cache (or its parent), including snapshot symlinks into `blobs`.
+Mount the whole cache so those relative symlinks resolve. Absolute symlinks outside
+the container mounts and directory symlinks are not supported. No models are
+downloaded, converted, or copied; only temporary symlinks and configuration are
+created. Safetensors/PyTorch checkpoints need conversion to a supported GGUF first.
+
+Each quantization is listed separately. Split GGUFs are registered once, using
+their first shard, and incomplete sets are skipped with a log message. Duplicate
+resolved model/projector paths are registered once, preferring `MODELS_DIR`.
+Models still need architectures supported by the pinned llama.cpp version;
+discovery checks file readability and the GGUF header, not full compatibility.
+
+For vision, keep a compatible `mmproj*.gguf` beside its model (or quantizations
+of that same model). Exactly one projector in that directory is attached
+automatically. With multiple projectors, discovery logs a warning and serves
+the model without vision; separate the matching pairs into different folders.
+Projectors and files named `draft-*` or `mtp-*` are not standalone model entries.
+
+Model IDs use `models/<relative-path-without-.gguf>` or
+`hf/<relative-path-without-.gguf>`. Special characters are percent-encoded;
+HF IDs include the snapshot revision. Query the catalog for the exact ID:
+
+```bash
+curl -fsS "http://${LLAMA_LISTEN_ADDR:-127.0.0.1}:${LLAMA_PORT:-8000}/v1/models" \
+  -H "Authorization: Bearer ${LLAMA_API_KEY}"
+```
+
+These commands assume `.env` variables are exported in your shell. Send the
+selected ID in the request's `model` field. Weights load on demand;
+`LLAMA_MODELS_MAX=1` limits resident models by default. Increase it only when
+the models and their context buffers fit together in available memory.
+`/health` checks the router; successful inference verifies an individual model.
+
+After adding or removing files, restart llama.cpp to rebuild the catalog.
+After changing mount paths, recreate the container:
+
+```bash
+./compose.sh llama.cpp up -d --build --force-recreate
+./compose.sh llama.cpp logs -f
+```
+
+### Migrating the previous single-model setup
+
+`MODEL_FILE` and `MMPROJ_FILE` are no longer used. Keep `MODELS_DIR`, optionally
+add `HF_CACHE_DIR`, and rebuild llama.cpp. The existing CUDA/ARM64 build and
+authentication remain in place. The pinned `v0.4.1` supports
+[router mode](https://github.com/ggml-org/llama.cpp/blob/v0.4.1/tools/server/README.md#using-multiple-models).
+
+For LiteLLM, update existing `.env` files to pass model IDs through:
+
+```dotenv
+LITELLM_MODEL=openai/*
+LLAMA_CPP_MODEL_NAME=*
+```
+
+Then recreate LiteLLM with `./compose.sh litellm up -d`. Through LiteLLM, request
+`openai/<llama.cpp-model-id>`. A fixed alias can still be used by setting
+`LLAMA_CPP_MODEL_NAME` to one actual discovered ID. NextChat's static model picker
+needs concrete IDs; a wildcard is not a selectable model. Configure its model
+list for the discovered IDs if using that UI.
 
 ## Prerequisites
 
@@ -25,7 +103,8 @@ cp .env.example .env
 chmod 600 .env
 ```
 
-Edit `.env`. At minimum, set `MODELS_DIR`, `MODEL_FILE`, and replace all `change-me` secrets. Set `MMPROJ_FILE` only for a model that needs a multimodal projection file.
+Edit `.env` and replace all `change-me` secrets. Optionally set `MODELS_DIR`,
+`HF_CACHE_DIR`, or both to absolute host directory paths (see below).
 
 `LLAMA_API_KEY` protects the llama.cpp backend from other containers on the shared network. `LITELLM_MASTER_KEY` protects the client-facing LiteLLM API and is supplied to NextChat. `NEXTCHAT_ACCESS_CODE` protects the UI.
 
@@ -246,4 +325,4 @@ Bring down the projects using the commands above; `./compose.sh litellm down` al
 docker network rm spark-llm
 ```
 
-This does not remove anything under `MODELS_DIR`. Images can be removed separately with `docker image rm` if desired.
+This does not remove anything under `MODELS_DIR` or `HF_CACHE_DIR`. Images can be removed separately with `docker image rm` if desired.

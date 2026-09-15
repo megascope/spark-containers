@@ -1,6 +1,6 @@
 FROM nvcr.io/nvidia/cuda:13.0.1-devel-ubuntu22.04 AS build
 
-ARG LLAMA_CPP_REF=v0.3.0
+ARG LLAMA_CPP_REF=v0.4.1
 
 RUN apt-get update && apt-get install -y \
     git \
@@ -44,6 +44,7 @@ RUN apt-get update && apt-get install -y \
       libgomp1 \
       ca-certificates \
       curl \
+      python3 \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid "${GID}" llama \
     && useradd \
@@ -59,6 +60,7 @@ RUN apt-get update && apt-get install -y \
 COPY --from=build /out/lib/ /app/
 COPY --from=build /out/llama-server /app/llama-server
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+COPY discover-models.py /app/discover-models.py
 
 RUN chmod 0555 /app/docker-entrypoint.sh
 

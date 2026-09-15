@@ -4,6 +4,12 @@ model_list:
       model: os.environ/LLAMA_CPP_MODEL
       api_base: os.environ/LLAMA_API_BASE
       api_key: os.environ/LLAMA_API_KEY
+      max_tokens: 8192
+  - model_name: "vllm/*"
+    litellm_params:
+      model: "openai/*"
+      api_base: os.environ/VLLM_API_BASE
+      api_key: os.environ/VLLM_API_KEY
   - model_name: "ollama_chat/*"
     litellm_params:
       model: "ollama_chat/*"
