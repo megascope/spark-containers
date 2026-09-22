@@ -1,6 +1,6 @@
 services:
   litellm:
-    image: ghcr.io/berriai/litellm-non_root:v1.100.1
+    image: ghcr.io/berriai/litellm-non_root:v1.101.0
     restart: unless-stopped
     init: true
     user: "65534:65534"
